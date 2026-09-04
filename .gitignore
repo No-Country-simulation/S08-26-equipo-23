@@ -6,3 +6,4 @@ dist/
 build/
 .next/
 *.log
+.atl/

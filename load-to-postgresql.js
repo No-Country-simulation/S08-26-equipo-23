@@ -75,7 +75,10 @@ async function loadDataToPostgres() {
 
         total_demand INT,
         assigned_turns INT,
+        unmet_demand INT,
         cancelled_turns INT,
+        no_show_turns INT,
+        rescheduled_turns INT,
         attended_turns INT,
         no_show_rate DECIMAL(5,2),
         occupancy_rate DECIMAL(5,2),
@@ -115,7 +118,8 @@ async function loadDataToPostgres() {
     const columns = [
       'date', 'day_of_week', 'week_number', 'month', 'specialty', 'site',
       'time_slot', 'time_slot_name', 'total_demand', 'assigned_turns',
-      'cancelled_turns', 'attended_turns', 'no_show_rate', 'occupancy_rate',
+      'unmet_demand', 'cancelled_turns', 'no_show_turns', 'rescheduled_turns',
+      'attended_turns', 'no_show_rate', 'occupancy_rate',
       'site_capacity', 'utilisation_percent'
     ];
     const batchSize = 1000;
@@ -130,7 +134,8 @@ async function loadDataToPostgres() {
         values.push(
           turn.date, turn.dayOfWeek, turn.weekNumber, turn.month,
           turn.specialty, turn.site, turn.timeSlot, turn.timeSlotName,
-          turn.totalDemand, turn.assignedTurns, turn.cancelledTurns,
+          turn.totalDemand, turn.assignedTurns, turn.unmetDemand,
+          turn.cancelledTurns, turn.noShowTurns, turn.rescheduledTurns,
           turn.attendedTurns, turn.noShowRate, turn.occupancyRate,
           turn.siteCapacity, turn.utilisationPercent
         );

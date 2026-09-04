@@ -84,18 +84,35 @@ function generateRealisticTurns() {
           // Calcular turnos asignados (70-95% de la demanda)
           const assignmentRate = 0.70 + Math.random() * 0.25;
           const assignedTurns = Math.floor(demand * assignmentRate);
-          
-          // Calcular cancelaciones (efecto estacional: más en invierno)
+
+          // Demanda que pidió turno pero no consiguió disponibilidad — el resto
+          // de la demanda que no se convirtió en turno asignado. Antes era un
+          // hueco implícito (demand - assignedTurns) sin nombre propio.
+          const unmetDemand = demand - assignedTurns;
+
+          // Calcular cancelaciones + ausencias (efecto estacional: más en invierno)
           const month = currentDate.getMonth();
           let noShowRate = specConfig.noShowRate;
           if (month >= 5 && month <= 8) { // Invierno (meses 6-9)
             noShowRate *= 1.4; // 40% más de no-shows en invierno
           }
-          const cancelledTurns = Math.floor(assignedTurns * noShowRate);
-          
+          const nonAttendedTurns = Math.floor(assignedTurns * noShowRate);
+
+          // Split cancelado (proactivo, el paciente avisa) vs ausente (no
+          // aparece sin avisar) — antes venían mezclados en un solo campo.
+          const cancelShare = 0.5 + Math.random() * 0.2; // 50-70% son cancelaciones
+          const cancelledTurns = Math.floor(nonAttendedTurns * cancelShare);
+          const noShowTurns = nonAttendedTurns - cancelledTurns;
+
+          // Reprogramaciones: una porción chica de los turnos asignados se
+          // mueve de horario en vez de cancelarse o ausentarse — no resta de
+          // attendedTurns, se siguen atendiendo, solo cambian de franja.
+          const rescheduleRate = 0.03 + Math.random() * 0.05; // 3-8%
+          const rescheduledTurns = Math.floor(assignedTurns * rescheduleRate);
+
           // Turnos atendidos
-          const attendedTurns = assignedTurns - cancelledTurns;
-          
+          const attendedTurns = assignedTurns - cancelledTurns - noShowTurns;
+
           // Ocupación real
           const occupancyRate = demand > 0 ? ((attendedTurns / demand) * 100).toFixed(2) : 0;
           
@@ -112,7 +129,10 @@ function generateRealisticTurns() {
             // Métricas de demanda
             totalDemand: demand,
             assignedTurns: assignedTurns,
+            unmetDemand: unmetDemand,
             cancelledTurns: cancelledTurns,
+            noShowTurns: noShowTurns,
+            rescheduledTurns: rescheduledTurns,
             attendedTurns: attendedTurns,
             noShowRate: parseFloat(noShowRate.toFixed(2)),
             occupancyRate: parseFloat(occupancyRate),
@@ -202,11 +222,22 @@ function printStatistics(turns) {
     console.log(`   ${site}: ${usage}% ocupación`);
   });
   
-  // Tasa de no-shows
+  // Tasa de cancelación/ausencia (cancelledTurns y noShowTurns están separados
+  // desde acá, se suman para el total como antes)
   const totalCancelled = turns.reduce((sum, t) => sum + t.cancelledTurns, 0);
+  const totalNoShow = turns.reduce((sum, t) => sum + t.noShowTurns, 0);
   const totalAssigned = turns.reduce((sum, t) => sum + t.assignedTurns, 0);
-  const noShowRate = ((totalCancelled / totalAssigned) * 100).toFixed(2);
-  console.log(`\n❌ Tasa de cancelación/ausencia: ${noShowRate}%`);
+  const noShowRate = (((totalCancelled + totalNoShow) / totalAssigned) * 100).toFixed(2);
+  console.log(`\n❌ Tasa de cancelación/ausencia: ${noShowRate}% (cancelado: ${((totalCancelled / totalAssigned) * 100).toFixed(2)}% · ausente: ${((totalNoShow / totalAssigned) * 100).toFixed(2)}%)`);
+
+  // Demanda insatisfecha
+  const totalUnmet = turns.reduce((sum, t) => sum + t.unmetDemand, 0);
+  const totalDemandAll = turns.reduce((sum, t) => sum + t.totalDemand, 0);
+  console.log(`📋 Solicitudes sin disponibilidad: ${totalUnmet} (${((totalUnmet / totalDemandAll) * 100).toFixed(2)}% de la demanda total)`);
+
+  // Reprogramaciones
+  const totalRescheduled = turns.reduce((sum, t) => sum + t.rescheduledTurns, 0);
+  console.log(`🔁 Turnos reprogramados: ${totalRescheduled} (${((totalRescheduled / totalAssigned) * 100).toFixed(2)}% de los asignados)`);
   
   // Por día de semana
   console.log('\n📆 Demanda por día de semana:');

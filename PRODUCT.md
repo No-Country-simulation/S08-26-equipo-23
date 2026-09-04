@@ -40,7 +40,7 @@ None yet. "HealthDemand" is the working product name; no logo, palette, or prior
 
 ## Evidence on Hand
 
-- `data/historical_turns.json` / `.csv` — 10,752 synthetic records, fields: `date, dayOfWeek, weekNumber, month, specialty, site, timeSlot, timeSlotName, totalDemand, assignedTurns, cancelledTurns, attendedTurns, noShowRate, occupancyRate, siteCapacity, utilisationPercent`.
+- `data/historical_turns.json` / `.csv` — 10,752 synthetic records, fields: `date, dayOfWeek, weekNumber, month, specialty, site, timeSlot, timeSlotName, totalDemand, assignedTurns, unmetDemand, cancelledTurns, noShowTurns, rescheduledTurns, attendedTurns, noShowRate, occupancyRate, siteCapacity, utilisationPercent`. `unmetDemand` (solicitudes sin disponibilidad), `noShowTurns` (ausencias, separado de `cancelledTurns`) y `rescheduledTurns` se sumaron a pedido del equipo, sobre una lista de variables más amplia que todavía es solo una visión — el resto (profesional, consultorio, disponibilidad granular, intento de reserva) queda documentado pero no implementado hasta que se confirme.
 - No real customer testimonials, logos, case studies, or production usage data exist — none should be fabricated or implied in the UI copy.
 
 ## Product Principles
