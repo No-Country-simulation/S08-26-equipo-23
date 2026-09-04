@@ -1,0 +1,25 @@
+{
+  "name": "health-demand-data-generator",
+  "version": "1.0.0",
+  "description": "Generador de dataset sintético realista para HealthDemand",
+  "main": "generate-medical-data.js",
+  "scripts": {
+    "generate": "node generate-medical-data.js",
+    "load-mongo": "node load-to-mongodb.js",
+    "load-postgres": "node load-to-postgresql.js"
+  },
+  "keywords": [
+    "healthcare",
+    "medical",
+    "prediction",
+    "dataset"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.0",
+    "mongoose": "^7.0.0",
+    "pg": "^8.8.0"
+  },
+  "devDependencies": {}
+}

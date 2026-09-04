@@ -1,0 +1,449 @@
+/* ==========================================================================
+   HealthDemand — "Consola de Guardia"
+   Terminal de mercado adaptado a monitoreo clínico. Grilla densa, hairlines
+   en vez de sombras, numérico en monoespaciado, paleta clara restringida.
+   ========================================================================== */
+
+:root {
+  /* Superficie */
+  --color-ground: #f6f7f9;
+  --color-panel: #ececf1;
+  --color-panel-strong: #e1e4ea;
+  --color-border: #d7dbe3;
+  --color-border-strong: #b9bfcb;
+
+  /* Tinta */
+  --color-ink: #14181f;
+  --color-ink-muted: #545e6e;
+  --color-ink-faint: #7a8494;
+
+  /* Acento (selección, acción primaria) */
+  --color-accent: #1f3a5f;
+  --color-accent-ink: #f6f7f9;
+  --color-accent-soft: #e2e8f1;
+
+  /* Estados semánticos — únicos tres colores con carga semántica del sistema */
+  --color-state-high: #a2440f;
+  --color-state-high-bg: #f6e3d4;
+  --color-state-high-border: #d98a4d;
+
+  --color-state-low: #1d5a9e;
+  --color-state-low-bg: #dce9f5;
+  --color-state-low-border: #7fa9cf;
+
+  --color-state-normal: #3e6f4a;
+  --color-state-normal-bg: #e2ece3;
+  --color-state-normal-border: #96b89e;
+
+  /* Tipografía */
+  --font-sans: var(--font-plex-sans), 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --step-0: 0.875rem;
+  --step-1: 1rem;
+  --step-2: 1.125rem;
+  --step-3: 1.35rem;
+  --step-4: 1.6rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: var(--color-ink);
+  background: var(--color-ground);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* -- Numérico: SIEMPRE monoespaciado, nunca decorativo ---------------- */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* -- Estructura general ------------------------------------------------ */
+
+.console {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.console-header {
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.console-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  padding: 0.85rem 1.75rem;
+}
+
+.console-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.console-brand .mark {
+  width: 0.6rem;
+  height: 0.6rem;
+  background: var(--color-accent);
+}
+
+.console-brand h1 {
+  font-size: var(--step-2);
+}
+
+.console-brand .tagline {
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+  letter-spacing: 0.01em;
+}
+
+/* Resumen de estado: lo primero que hay que poder leer sin abrir ninguna
+   fila — cuántas especialidades se vigilan y cuántas piden atención. */
+.console-status {
+  font-size: 0.8rem;
+  color: var(--color-ink-muted);
+}
+
+.console-status .status-alert {
+  color: var(--color-state-high);
+  font-weight: 600;
+}
+
+.console-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+  gap: 0;
+  align-items: start;
+}
+
+@media (max-width: 920px) {
+  .console-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -- Selector de sede ---------------------------------------------------- */
+
+.site-select {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.site-select select {
+  -webkit-appearance: none;
+  appearance: none;
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-ink);
+  background-color: var(--color-ground);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23545E6E' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.6rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  padding: 0.35rem 1.75rem 0.35rem 0.6rem;
+}
+
+.site-select select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* -- Watchlist ------------------------------------------------------------ */
+
+.watchlist {
+  border-right: 1px solid var(--color-border);
+  /* Grilla densa de ancho fijo: en vez de romper el layout en pantallas
+     angostas, este único componente scrollea horizontalmente — nunca la
+     página entera. */
+  overflow-x: auto;
+}
+
+.watchlist-head,
+.watchlist-row {
+  min-width: 560px;
+}
+
+.watchlist-head {
+  display: grid;
+  grid-template-columns: 1.6fr 0.9fr 1.1fr 0.7fr 0.9fr;
+  gap: 1rem;
+  padding: 0.5rem 1.75rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-ink-faint);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.watchlist-row {
+  display: grid;
+  grid-template-columns: 1.6fr 0.9fr 1.1fr 0.7fr 0.9fr;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.65rem 1.75rem;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+}
+
+.watchlist-row:hover {
+  background: var(--color-panel);
+}
+
+.watchlist-row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.watchlist-row[aria-current='true'] {
+  background: var(--color-accent-soft);
+}
+
+.watchlist-row[aria-current='true'] .specialty-name {
+  color: var(--color-accent);
+}
+
+.specialty-name {
+  font-weight: 600;
+  font-size: var(--step-1);
+}
+
+.specialty-meta {
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+}
+
+.reading {
+  font-size: var(--step-2);
+  font-weight: 600;
+}
+
+.reading-unit {
+  font-size: 0.7rem;
+  color: var(--color-ink-faint);
+  font-family: var(--font-sans);
+  margin-left: 0.3rem;
+}
+
+.sparkline {
+  width: 100%;
+  height: 28px;
+}
+
+.zscore {
+  color: var(--color-ink-muted);
+}
+
+/* -- Badge de estado (semáforo) ------------------------------------------ */
+
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  width: fit-content;
+}
+
+.state-badge::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.state-badge.is-high {
+  color: var(--color-state-high);
+  background: var(--color-state-high-bg);
+  border-color: var(--color-state-high-border);
+}
+
+.state-badge.is-low {
+  color: var(--color-state-low);
+  background: var(--color-state-low-bg);
+  border-color: var(--color-state-low-border);
+}
+
+.state-badge.is-normal {
+  color: var(--color-state-normal);
+  background: var(--color-state-normal-bg);
+  border-color: var(--color-state-normal-border);
+}
+
+/* -- Panel de detalle ------------------------------------------------------ */
+
+.detail-panel {
+  padding: 1.5rem 1.75rem;
+  background: var(--color-ground);
+}
+
+.detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.detail-head h2 {
+  font-size: var(--step-3);
+}
+
+.detail-head .site-context {
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+}
+
+.chart-frame {
+  border: 1px solid var(--color-border);
+  background: var(--color-panel);
+  padding: 1rem 0.75rem 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+  padding: 0 0.5rem 0.5rem;
+}
+
+.chart-legend .swatch {
+  display: inline-block;
+  width: 0.9rem;
+  height: 2px;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+}
+
+.stat-cell {
+  background: var(--color-ground);
+  padding: 0.75rem 0.9rem;
+}
+
+.stat-cell .label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-faint);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.stat-cell .value {
+  font-size: var(--step-2);
+  font-weight: 600;
+}
+
+.stat-note {
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--color-ink-muted);
+  max-width: 60ch;
+}
+
+.empty-note {
+  color: var(--color-ink-faint);
+  font-size: 0.85rem;
+  padding: 1rem 1.75rem;
+}
+
+/* -- Estado de error --------------------------------------------------- */
+
+.load-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.75rem;
+  color: var(--color-ink-muted);
+}
+
+.load-error p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.load-error button {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent);
+  border-radius: 0;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.load-error button:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.load-error button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
