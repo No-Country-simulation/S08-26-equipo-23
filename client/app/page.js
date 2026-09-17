@@ -5,7 +5,7 @@ import Filters from '../components/Filters';
 import DemandChart from '../components/DemandChart';
 import AlertsTable from '../components/AlertsTable';
 import SpecialtyWatchlist from '../components/SpecialtyWatchlist';
-import { getHistorical, getSites, getPredictions, getAlerts } from '../lib/api';
+import { getHistorical, getNeighborhoods, getPredictions, getAlerts } from '../lib/api';
 import { groupBySpecialtyDate, seriesFor } from '../lib/aggregate';
 
 const DIRECTION_CONTRACT = `
@@ -26,8 +26,8 @@ staging: filas continuas tipo watchlist, la selección expande el detalle al lad
 `;
 
 export default function Page() {
-  const [sites, setSites] = useState([]);
-  const [site, setSite] = useState('');
+  const [neighborhoods, setNeighborhoods] = useState([]);
+  const [neighborhood, setNeighborhood] = useState('');
   const [historical, setHistorical] = useState([]);
   const [predictions, setPredictions] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -37,7 +37,7 @@ export default function Page() {
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    getSites().then(setSites).catch(() => setSites([]));
+    getNeighborhoods().then(setNeighborhoods).catch(() => setNeighborhoods([]));
   }, []);
 
   useEffect(() => {
@@ -46,9 +46,9 @@ export default function Page() {
     setLoadError(false);
 
     Promise.all([
-      getHistorical({ site }).then(setHistorical),
-      getPredictions({ site }).then(setPredictions),
-      getAlerts().then(setAlerts)
+      getHistorical({ neighborhood }).then(setHistorical),
+      getPredictions({ neighborhood }).then(setPredictions),
+      getAlerts({ neighborhood }).then(setAlerts)
     ])
       .catch(() => {
         if (!cancelled) setLoadError(true);
@@ -60,7 +60,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [site, retryKey]);
+  }, [neighborhood, retryKey]);
 
   const historicalBySpecialty = useMemo(() => groupBySpecialtyDate(historical, 'total_demand'), [historical]);
 
@@ -112,7 +112,7 @@ export default function Page() {
             </div>
           )}
 
-          <Filters sites={sites} site={site} onSiteChange={setSite} />
+          <Filters neighborhoods={neighborhoods} neighborhood={neighborhood} onNeighborhoodChange={setNeighborhood} />
         </div>
       </header>
 
@@ -132,7 +132,7 @@ export default function Page() {
               <>
                 <div className="detail-head">
                   <h2>{selected}</h2>
-                  <span className="site-context">{site || 'Todas las sedes'}</span>
+                  <span className="site-context">{neighborhood || 'Todos los barrios'}</span>
                 </div>
                 <DemandChart historical={selectedHistorical} predictions={selectedPredictions} />
                 <AlertsTable alert={selectedAlert} />

@@ -27,8 +27,8 @@ export async function getSpecialties() {
   return request('/api/historical/specialties');
 }
 
-export async function getSites() {
-  return request('/api/historical/sites');
+export async function getNeighborhoods() {
+  return request('/api/historical/neighborhoods');
 }
 
 export async function getPredictions(params) {

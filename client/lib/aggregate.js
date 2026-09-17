@@ -1,5 +1,5 @@
 // Agrupa filas crudas de /api/historical o /api/predictions por especialidad
-// y fecha, sumando el campo indicado a través de sedes y franjas horarias.
+// y fecha, sumando el campo indicado a través de barrios.
 export function groupBySpecialtyDate(rows = [], valueKey) {
   const bySpecialty = new Map();
   for (const row of rows) {

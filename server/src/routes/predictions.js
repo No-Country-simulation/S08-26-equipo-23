@@ -5,18 +5,18 @@ const router = express.Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { specialty, site, from, to } = req.query;
+    const { specialty, neighborhood, from, to } = req.query;
 
     const conditions = [];
     const params = [];
 
     if (specialty) {
       params.push(specialty);
-      conditions.push(`specialty = $${params.length}`);
+      conditions.push(`specialty ILIKE $${params.length}`);
     }
-    if (site) {
-      params.push(site);
-      conditions.push(`site = $${params.length}`);
+    if (neighborhood) {
+      params.push(neighborhood);
+      conditions.push(`neighborhood ILIKE $${params.length}`);
     }
     if (from) {
       params.push(from);
@@ -50,15 +50,14 @@ router.post('/import', async (req, res, next) => {
 
     for (const p of predictions) {
       await pool.query(
-        `INSERT INTO predictions (date, specialty, site, time_slot, predicted_demand, confidence, model_version)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (date, specialty, site, time_slot, model_version)
+        `INSERT INTO predictions (date, specialty, neighborhood, predicted_demand, confidence, model_version)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (date, specialty, neighborhood, model_version)
          DO UPDATE SET predicted_demand = EXCLUDED.predicted_demand, confidence = EXCLUDED.confidence, created_at = CURRENT_TIMESTAMP`,
         [
           p.date,
           p.specialty,
-          p.site,
-          p.timeSlot,
+          p.neighborhood,
           p.predictedDemand,
           p.confidence,
           version

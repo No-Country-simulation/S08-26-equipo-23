@@ -8,13 +8,13 @@ web
 
 ## Users
 
-Primary user: a **responsable de planificación** (planning/operations manager) at a multi-site medical network, managing turnos (appointments) across several specialties, sites, and time slots. Their job is to look at expected demand for an upcoming period, spot demand/capacity imbalances, and decide on staffing/schedule adjustments before saturation or underutilization happens — moving from reactive to preventive planning.
+Primary user: a **responsable de planificación** (planning/operations manager) at a multi-neighborhood medical network, managing turnos (appointments) across several specialties and Buenos Aires neighborhoods. Their job is to look at expected demand for an upcoming period, spot demand/capacity imbalances, and decide on staffing/schedule adjustments before saturation or underutilization happens — moving from reactive to preventive planning.
 
 Secondary context (affects presentation, not product function): this MVP is being evaluated as part of a job-simulation program (NoCountry-style), where a real company will compare it against other competing MVPs. That audience judges credibility and polish, but the product itself is still built for the planning-manager user above — no separate "evaluator" feature set.
 
 ## Product Purpose
 
-HealthDemand turns historical turno data (specialty, site, time slot, cancellations, no-shows, utilisation) into two complementary signals — a working statistical anomaly detector and a slot for real ML-driven demand forecasts — so a planning manager can act before a demand imbalance becomes a problem, instead of only ever seeing what already happened.
+HealthDemand turns historical turno data (specialty, neighborhood, cancellations, no-shows, utilisation) into two complementary signals — a working statistical anomaly detector and a slot for real ML-driven demand forecasts — so a planning manager can act before a demand imbalance becomes a problem, instead of only ever seeing what already happened.
 
 ## Positioning
 
@@ -22,14 +22,14 @@ Most tools available to this role show historical counts only ("¿cuántos turno
 
 ## Operating Context
 
-- Multi-site medical network: 3 sedes (Sede Centro, Sede Norte, Sede Sur), 7 especialidades (Cardiología, Oftalmología, Dermatología, Neurología, Traumatología, Pediatría, Ginecología), 4 franjas horarias/día, Mon–Fri.
-- Current dataset is synthetic (10,752 historical records over 180 days) — realistic in shape (peak days, seasonality, no-show rates, site capacity) but not real production data.
+- Multi-neighborhood coverage across Buenos Aires: 10 barrios (Palermo, Recoleta, Belgrano, Caballito, Almagro, Flores, La Boca, Villa Crespo, Constitución, Nuñez), each with a fixed socioeconomic level, and 10 especialidades (Cardiología, Pediatría, Dermatología, Traumatología, Alergología, Neumonología, Gastroenterología, Psicología, Oftalmología, Clínica Médica). No time-slot dimension — daily granularity.
+- Current dataset is real neighborhood-level data (~69,100 records over roughly 2 years), not synthetic.
 - Built as a 1-month MVP by a solo full-stack developer (Node/Express + React), with a separate team delivering ML predictions later; the two workstreams integrate through one HTTP contract (`POST /api/predictions/import`), not shared code or a shared database role.
 - Presentation context: desktop-first. It will be judged live/via demo, screenshots, or a pitch rather than used on a phone in the field — polish should target a real desktop working session, not a responsive-everywhere build.
 
 ## Capabilities and Constraints
 
-- Backend: Express API, raw `pg` (no ORM), PostgreSQL (Railway). Endpoints live today: `GET /api/historical` (+`/specialties`, `/sites`), `GET/POST /api/predictions` (ML ingestion, currently empty pending the ML team's delivery), `GET /api/alerts` (z-score anomaly detection over historical demand, tunable `?window=`/`?threshold=`).
+- Backend: Express API, raw `pg` (no ORM), PostgreSQL (Railway). Endpoints live today: `GET /api/historical` (+`/specialties`, `/neighborhoods`), `GET/POST /api/predictions` (ML ingestion, currently empty pending the ML team's delivery), `GET /api/alerts` (z-score anomaly detection over historical demand, tunable `?window=`/`?threshold=`/`?neighborhood=`).
 - Frontend: Next.js, App Router, plain JavaScript (no TypeScript — team preference, not a hard technical constraint).
 - No auth, no real-time/websocket updates, no migration framework — deliberate MVP scope cuts, not gaps to silently fix.
 - No ML/forecasting logic lives in this codebase; it is explicitly out of scope for this app and owned by a separate team.
@@ -40,7 +40,7 @@ None yet. "HealthDemand" is the working product name; no logo, palette, or prior
 
 ## Evidence on Hand
 
-- `data/historical_turns.json` / `.csv` — 10,752 synthetic records, fields: `date, dayOfWeek, weekNumber, month, specialty, site, timeSlot, timeSlotName, totalDemand, assignedTurns, unmetDemand, cancelledTurns, noShowTurns, rescheduledTurns, attendedTurns, noShowRate, occupancyRate, siteCapacity, utilisationPercent`. `unmetDemand` (solicitudes sin disponibilidad), `noShowTurns` (ausencias, separado de `cancelledTurns`) y `rescheduledTurns` se sumaron a pedido del equipo, sobre una lista de variables más amplia que todavía es solo una visión — el resto (profesional, consultorio, disponibilidad granular, intento de reserva) queda documentado pero no implementado hasta que se confirme.
+- `data/healthdemand_buenos_aires.xlsx` — ~69,100 real neighborhood-level records over ~2 years, fields (translated to English on load): `date, dayOfWeek, dayNumber, month, year, isHoliday, neighborhood, specialty, availableSlots, assignedTurns, attendedTurns, unmetDemand, cancelledTurns, noShowTurns, noShowRate, occupancyRate, saturationLevel, seasonFactor`. `saturationLevel` is an informational field carried by the dataset itself — it does not feed this app's own z-score anomaly calculation, kept as a separate signal. The earlier synthetic dataset (`data/historical_turns.json` / `.csv`) is retired; `generate-medical-data.js` and `load-to-postgresql.js` remain in the repo for reference but are no longer the load path in use.
 - No real customer testimonials, logos, case studies, or production usage data exist — none should be fabricated or implied in the UI copy.
 
 ## Product Principles
@@ -48,5 +48,5 @@ None yet. "HealthDemand" is the working product name; no logo, palette, or prior
 1. **Prevención, no reporte.** Cada vista debe ayudar a decidir algo antes de que pase, no solo mostrar historia.
 2. **Nunca mezclar señales.** Alertas estadísticas (hoy) y predicciones de ML (a futuro) se muestran como fuentes distintas y explícitamente rotuladas — jamás fusionadas o indistinguibles.
 3. **Transparencia estadística.** Ninguna alerta es una caja negra: siempre se puede ver el baseline, el desvío y el z-score detrás del estado "alto/bajo/normal".
-4. **Los ejes que importan son especialidad, sede y franja horaria.** Cualquier vista nueva debe poder cortarse por esas tres dimensiones, porque son las que la organización realmente planifica.
+4. **Los ejes que importan son especialidad y barrio.** Cualquier vista nueva debe poder cortarse por esas dos dimensiones, porque son las que la organización realmente planifica.
 5. **Credibilidad a primera vista.** Es un MVP evaluado por una empresa real en minutos — la primera impresión debe leerse como producto operativo serio, no como prototipo de bootcamp.

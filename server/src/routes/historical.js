@@ -14,12 +14,12 @@ router.get('/specialties', async (req, res, next) => {
   }
 });
 
-router.get('/sites', async (req, res, next) => {
+router.get('/neighborhoods', async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT DISTINCT site FROM historical_turns ORDER BY site'
+      'SELECT DISTINCT neighborhood FROM historical_turns ORDER BY neighborhood'
     );
-    res.json(result.rows.map((row) => row.site));
+    res.json(result.rows.map((row) => row.neighborhood));
   } catch (err) {
     next(err);
   }
@@ -27,18 +27,18 @@ router.get('/sites', async (req, res, next) => {
 
 router.get('/', async (req, res, next) => {
   try {
-    const { specialty, site, from, to } = req.query;
+    const { specialty, neighborhood, from, to } = req.query;
 
     const conditions = [];
     const params = [];
 
     if (specialty) {
       params.push(specialty);
-      conditions.push(`specialty = $${params.length}`);
+      conditions.push(`specialty ILIKE $${params.length}`);
     }
-    if (site) {
-      params.push(site);
-      conditions.push(`site = $${params.length}`);
+    if (neighborhood) {
+      params.push(neighborhood);
+      conditions.push(`neighborhood ILIKE $${params.length}`);
     }
     if (from) {
       params.push(from);
@@ -50,7 +50,7 @@ router.get('/', async (req, res, next) => {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const query = `SELECT * FROM historical_turns ${where} ORDER BY date`;
+    const query = `SELECT *, (assigned_turns + unmet_demand) AS total_demand FROM historical_turns ${where} ORDER BY date`;
 
     const result = await pool.query(query, params);
     res.json(result.rows);

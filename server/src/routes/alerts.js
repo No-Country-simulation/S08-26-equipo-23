@@ -11,10 +11,19 @@ router.get('/', async (req, res, next) => {
     const thresholdRaw = parseFloat(req.query.threshold);
     const threshold = Number.isFinite(thresholdRaw) ? thresholdRaw : 2;
 
+    const { neighborhood } = req.query;
+    const params = [String(window), threshold];
+    let neighborhoodFilter = '';
+    if (neighborhood) {
+      params.push(neighborhood);
+      neighborhoodFilter = `WHERE neighborhood ILIKE $${params.length}`;
+    }
+
     const query = `
       WITH daily AS (
-        SELECT date, specialty, SUM(total_demand) AS daily_demand
+        SELECT date, specialty, SUM(assigned_turns + unmet_demand) AS daily_demand
         FROM historical_turns
+        ${neighborhoodFilter}
         GROUP BY date, specialty
       ),
       anchor AS ( SELECT MAX(date) AS max_date FROM historical_turns ),
@@ -60,7 +69,7 @@ router.get('/', async (req, res, next) => {
       ORDER BY ABS((recent_avg_demand - mean_demand) / NULLIF(standard_error, 0)) DESC NULLS LAST;
     `;
 
-    const result = await pool.query(query, [String(window), threshold]);
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
     next(err);
