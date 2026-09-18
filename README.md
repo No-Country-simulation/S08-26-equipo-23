@@ -214,10 +214,8 @@ print(response.status_code, response.json())  # {"imported": N, "modelVersion": 
 ```
 Si su modelo trabaja con pandas, `df.to_dict("records")` (ajustando nombres de columna) arma la lista directo.
 
-**Más fácil todavía:** `submit-predictions.py` en la raíz del repo hace todo esto por ustedes — valida los campos, avisa si un nombre de especialidad/barrio no matchea, y manda en lotes. Solo hace falta `pip install requests` y llamar a `submit_predictions(sus_predicciones)`.
+**Más fácil todavía:** `submit-predictions.py` en la raíz del repo hace toda la limpieza — valida los campos, avisa si un nombre de especialidad/barrio no matchea, y manda en lotes. Solo hace falta `pip install requests` y llamar a `submit_predictions(sus_predicciones)`.
 
 ---
-
-**HealthDemand — MVP construido en un programa tipo NoCountry, evaluado por una empresa real.**
 
 **Equipo S08-26-Equipo-23**
