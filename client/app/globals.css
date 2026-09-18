@@ -141,6 +141,21 @@ table {
   font-weight: 600;
 }
 
+/* Segunda línea del header: qué rango se está mostrando y a qué se ancla
+   la ventana de alertas — ambos datos "miden" algo, por eso van en Mono. */
+.console-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.75rem;
+  padding: 0 1.75rem 0.7rem;
+  font-size: 0.72rem;
+  color: var(--color-ink-faint);
+}
+
+.console-meta .num {
+  color: var(--color-ink-muted);
+}
+
 .console-body {
   flex: 1;
   display: grid;
@@ -155,7 +170,14 @@ table {
   }
 }
 
-/* -- Selector de sede ---------------------------------------------------- */
+/* -- Filtros (barrio + rango de fechas) ----------------------------------- */
+
+.filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
 
 .site-select {
   display: flex;
@@ -165,6 +187,21 @@ table {
   color: var(--color-ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.site-select input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  color: var(--color-ink);
+  background-color: var(--color-ground);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  padding: 0.3rem 0.5rem;
+}
+
+.site-select input[type='date']:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .site-select select {

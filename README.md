@@ -1,6 +1,5 @@
 # HealthDemand
 
-Plataforma de análisis y predicción de demanda médica que utiliza datos históricos de turnos para anticipar necesidades futuras, detectar picos de demanda y facilitar la planificación de profesionales, agendas y recursos.
 
 **Stack:** Node.js + Express (API) · PostgreSQL (Railway) · Next.js + React, JS plano sin TypeScript (dashboard) · predicciones de demanda a cargo de un modelo de ML independiente.
 

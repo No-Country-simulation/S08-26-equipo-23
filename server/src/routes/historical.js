@@ -25,6 +25,21 @@ router.get('/neighborhoods', async (req, res, next) => {
   }
 });
 
+router.get('/range', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT MIN(date) AS min_date, MAX(date) AS max_date FROM historical_turns'
+    );
+    const { min_date: minDate, max_date: maxDate } = result.rows[0];
+    res.json({
+      minDate: minDate ? minDate.toISOString().slice(0, 10) : null,
+      maxDate: maxDate ? maxDate.toISOString().slice(0, 10) : null
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/', async (req, res, next) => {
   try {
     const { specialty, neighborhood, from, to } = req.query;

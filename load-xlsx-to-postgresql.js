@@ -20,6 +20,18 @@ client.on('error', (err) => {
 const XLSX_PATH = path.join(__dirname, 'data', 'healthdemand_buenos_aires.xlsx');
 const SHEET_NAME = 'healthdemand_buenos_aires';
 
+// Columnas que el resto del script espera encontrar en el xlsx (nombres
+// españoles originales). Si el equipo de datos re-entrega el archivo con
+// alguna renombrada o eliminada, mejor frenar acá con un error claro que
+// dejar que cada fila cargue `null` en silencio para ese campo.
+const EXPECTED_COLUMNS = [
+  'fecha', 'dia_semana', 'numero_dia_semana', 'mes', 'año', 'es_feriado',
+  'barrio', 'nivel_socioeconomico', 'especialidad', 'turnos_disponibles',
+  'turnos_asignados', 'turnos_atendidos', 'demanda_no_atendida',
+  'cancelaciones', 'ausencias', 'tasa_ausentismo', 'ocupacion',
+  'nivel_saturacion', 'factor_temporada'
+];
+
 // Excel guarda las fechas como número de serie (días desde 1899-12-30). Con
 // `cellDates: true` en XLSX.readFile, la librería ya las entrega como Date;
 // esta función queda como red de seguridad por si algún valor llega como
@@ -84,6 +96,27 @@ async function loadXlsxToPostgres() {
     console.log(`📊 Filas leídas del xlsx: ${rawRows.length}\n`);
     console.log('🔍 Primera fila cruda (verificación de parseo):');
     console.log(rawRows[0], '\n');
+
+    // Verificamos el encabezado real del archivo contra lo que el resto del
+    // script asume ANTES de tocar la base — si esto corre después del DROP
+    // TABLE de abajo, un archivo con columnas renombradas nos deja sin datos
+    // y sin tablas. Se lee la fila 0 como array crudo (header: 1) para
+    // comparar los nombres tal cual vienen, no los valores.
+    const headerRow = (XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] || []).map((h) =>
+      typeof h === 'string' ? h.trim() : h
+    );
+    const missingColumns = EXPECTED_COLUMNS.filter((col) => !headerRow.includes(col));
+    const extraColumns = headerRow.filter((col) => !EXPECTED_COLUMNS.includes(col));
+
+    if (missingColumns.length > 0) {
+      console.error('❌ Faltan columnas esperadas en el xlsx:', missingColumns.join(', '));
+      console.error('   Columnas encontradas:', headerRow.join(', '), '\n');
+      process.exit(1);
+    }
+
+    if (extraColumns.length > 0) {
+      console.warn(`⚠️ Columnas nuevas encontradas, se van a ignorar: ${extraColumns.join(', ')}\n`);
+    }
 
     // Normalizamos cada fila a los nombres de columna en inglés que usa el
     // resto del código (la traducción sucede acá, en el borde de carga —

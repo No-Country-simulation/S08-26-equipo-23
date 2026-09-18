@@ -31,6 +31,10 @@ export async function getNeighborhoods() {
   return request('/api/historical/neighborhoods');
 }
 
+export async function getDateRange() {
+  return request('/api/historical/range');
+}
+
 export async function getPredictions(params) {
   return request('/api/predictions', params);
 }
