@@ -2,11 +2,14 @@
 
 Plataforma de análisis predictivo diseñada para anticipar la demanda de turnos médicos en centros de salud, usando datos históricos sintéticos contextualizados localmente para detectar picos de demanda, optimizar la asignación de profesionales y reducir tanto la saturación como la subutilización de recursos.
 
-**Stack:** Data Science (Python, Pandas, Scikit-Learn) para el modelado de predicciones · Node.js + Express (API) · PostgreSQL (Railway) · Next.js + React, JS plano sin TypeScript (dashboard).
+**Stack:**
+- **Equipo de ML / Data Science:** Python, Pandas, Scikit-Learn — modelado y generación de las predicciones de demanda.
+- **Backend:** Node.js + Express (API), PostgreSQL (Railway).
+- **Frontend:** Next.js + React, JS plano sin TypeScript (dashboard).
 
 **Dataset actual:** dataset sintético pero realista, agregado por día, barrio de Buenos Aires y especialidad (`data/healthdemand_buenos_aires.xlsx`) — generado con estacionalidad argentina y perfiles socioeconómicos reales de CABA, no datos medidos de una clínica real. Ver [sección 3](#3-qué-datos-usa-hoy).
 
-Documentación relacionada: [PRODUCT.md](PRODUCT.md) (spec de producto, usuarios, posicionamiento) y [DESIGN.md](DESIGN.md) (sistema de diseño). Este archivo es el punto de entrada único para todo lo demás: problema de negocio, arquitectura, cómo levantar el proyecto, contrato para el equipo de ML, y decisiones/pendientes.
+Documentación relacionada: [PRODUCT.md](PRODUCT.md) (spec de producto, usuarios, posicionamiento) y [DESIGN.md](DESIGN.md) (sistema de diseño). Este archivo es el punto de entrada único para todo lo demás: problema de negocio, arquitectura, cómo levantar el proyecto, y contrato para el equipo de ML.
 
 ---
 
@@ -66,7 +69,7 @@ data/healthdemand_buenos_aires.xlsx  →  load-xlsx-to-postgresql.js  →  Postg
 | API | Expone los datos por HTTP: histórico, alertas, predicciones | `server/` |
 | Dashboard | Consume la API y muestra gráficos + watchlist de alertas | `client/` |
 
-**Nota sobre el dataset sintético anterior**: `generate-medical-data.js`, `load-to-postgresql.js` y `load-to-mongodb.js` (este último nunca estuvo en uso) generaban y cargaban un dataset sintético arbitrario, sin anclaje al mundo real (7 especialidades × 3 sedes × 4 franjas horarias × 180 días). Quedan en el repo como referencia/utilidad de testing, pero **ya no son el camino activo** — el dataset sintético nuevo de `data/healthdemand_buenos_aires.xlsx`, contextualizado con barrios y estacionalidad reales de CABA, los reemplazó.
+**Nota**: `generate-medical-data.js`, `load-to-postgresql.js` y `load-to-mongodb.js` generaban un dataset sintético anterior, más arbitrario. Quedan en el repo como referencia, pero **ya no son el camino activo** — lo reemplazó `data/healthdemand_buenos_aires.xlsx`.
 
 La lógica de predicción con Machine Learning **no vive en este proyecto**. La hace otro equipo por separado y se conecta acá mediante un único endpoint (`POST /api/predictions/import`, ver sección 6). HealthDemand no genera predicciones, las recibe y las muestra.
 
@@ -211,37 +214,7 @@ print(response.status_code, response.json())  # {"imported": N, "modelVersion": 
 ```
 Si su modelo trabaja con pandas, `df.to_dict("records")` (ajustando nombres de columna) arma la lista directo.
 
----
-
-## 7. Decisiones y bugs corregidos (para que quede el porqué)
-
-### Migración al dataset sintético nuevo (2026-09)
-- **Barrio reemplaza sede, sin franja horaria**: el dataset nuevo viene agregado por día+barrio+especialidad (no por sede+franja horaria). Se decidió mantener la convención de nombres en inglés que ya tenía el código (se traduce cada columna española al cargar) en vez de adoptar los nombres del xlsx tal cual.
-- **Se mantiene el z-score propio en vez de `nivel_saturacion`**: el xlsx trae un campo precalculado por el equipo de datos, pero se decidió no reemplazar el detector estadístico propio del backend — es el diferencial de producto documentado en PRODUCT.md. `saturation_level` se guarda aparte, solo informativo.
-- **`total_demand` se calcula en SQL** (`assigned_turns + unmet_demand`) en vez de ser columna física — así el frontend no necesitó tocar `aggregate.js` ni los componentes de gráfico/alertas.
-- **Tabla `predictions` con esquema viejo**: `ensureSchema.js` usa `CREATE TABLE IF NOT EXISTS`, que no migra una tabla ya existente. La tabla `predictions` en Railway seguía con `site`/`time_slot` del esquema anterior (vacía, 0 filas) y tiraba `column "neighborhood" does not exist`. Se dropeó manualmente (sin pérdida de datos) para que se recreara con el esquema nuevo en el siguiente arranque.
-- **`getAlerts()` no pasaba el filtro de barrio**: el panel de alertas/watchlist siempre mostraba el agregado de los 10 barrios juntos, aunque hubiera un barrio filtrado en el selector — el gráfico e histórico sí respetaban el filtro, las alertas no. Bug preexistente (pasaba lo mismo con "sede" antes), corregido pasando `{ neighborhood }` a `getAlerts` en `page.js`.
-- **Filtros case-sensitive**: `specialty`/`neighborhood` en `historical.js`, `alerts.js` y `predictions.js` comparaban con `=` exacto (Postgres es case-sensitive por default) — `caballito` no matcheaba `Caballito`. Se cambió a `ILIKE` en los tres endpoints.
-
-### Del dataset sintético original
-- **Orden de creación de tablas**: `load-to-postgresql.js` creaba `historical_turns` (con FKs) antes que las tablas referenciadas — se invirtió el orden.
-- **Carga fila por fila → batches**: 10.752 `INSERT`s individuales contra la base remota se cortaban a mitad de camino por el proxy público de Railway — se cambió a lotes de 1000.
-- **Manejo de corte de conexión**: listener de error en el cliente de Postgres para que un corte de red no tire abajo el proceso sin aviso.
-- **Cálculo de z-score**: la primera versión comparaba contra el desvío estándar diario crudo sin ajustar por tamaño de muestra — casi nunca disparaba una alerta real. Se corrigió con error estándar (`stddev / √n`).
-- **Sin manejo de error en el dashboard**: si la API no respondía, el panel quedaba en "Cargando…" para siempre. Ahora muestra error + botón "Reintentar".
-- **Copy que exponía proceso interno**: el gráfico decía "Proyectada — a la espera de predicciones del equipo de ML" — lenguaje interno que no debería ver alguien externo evaluando el MVP. Se cambió a "sin datos disponibles todavía".
-
----
-
-## 8. Pendiente / decisiones abiertas
-
-- **Performance de `/api/historical` sin filtrar**: el estado por defecto ("Todos los barrios") pide las 69.100 filas crudas (~31.5MB, ~3s en localhost). El frontend solo necesita sumas por especialidad+fecha para los sparklines, no cada columna de cada fila — conviene agregarlo en SQL antes de una demo con conexión real (no loopback).
-- **Repo sin remoto / sin deploy**: todo corre en `localhost` hoy. Si la presentación necesita una URL pública en vez de demo en vivo desde la máquina de origen, falta desplegar `client/` (ej. Vercel) y `server/` (ej. Railway).
-- **Acceso a la base**: solo existe el usuario `postgres` (superusuario). Está propuesto un usuario de solo lectura para analistas — no es necesario si el equipo de ML solo consume la API (sección 6), no necesitan tocar la base directo.
-- **Vulnerabilidad conocida en `xlsx` (SheetJS)**: `npm audit` marca un "high" (prototype pollution / ReDoS) sin parche publicado en el registro de npm — riesgo bajo hoy porque solo se usa en `load-xlsx-to-postgresql.js`, un script local que lee un archivo de confianza, no expuesto a input de usuarios por HTTP.
-- **Regeneración del dataset sintético**: `generate-medical-data.js` genera fechas relativas al día en que se corre — no es el camino activo, pero si se vuelve a usar como fixture de testing, tenerlo en cuenta.
-- **Sin tests automatizados**: no hay suite de tests en `server/` ni `client/`. No bloqueante para un MVP de 1 mes, pero vale nombrarlo si el criterio de evaluación le da peso a eso.
-- **Variables de la visión del equipo, todavía sin confirmar**: `profesional`, `consultorio`, `profesionales_disponibles`, `consultorios_disponibles`, `horas_disponibles`, `cupos_disponibles`, `lista_de_espera`, `intento_de_reserva`. Implica sumar dos dimensiones nuevas y repensar la consola — se encara como su propia etapa si el equipo lo confirma.
+**Más fácil todavía:** `submit-predictions.py` en la raíz del repo hace todo esto por ustedes — valida los campos, avisa si un nombre de especialidad/barrio no matchea, y manda en lotes. Solo hace falta `pip install requests` y llamar a `submit_predictions(sus_predicciones)`.
 
 ---
 
