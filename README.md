@@ -1,11 +1,21 @@
-# HealthDemand
+# HealthDemand — Sistema de Predicción y Gestión de Demanda de Turnos
 
+Plataforma de análisis predictivo diseñada para anticipar la demanda de turnos médicos en centros de salud, usando datos históricos sintéticos contextualizados localmente para detectar picos de demanda, optimizar la asignación de profesionales y reducir tanto la saturación como la subutilización de recursos.
 
-**Stack:** Node.js + Express (API) · PostgreSQL (Railway) · Next.js + React, JS plano sin TypeScript (dashboard) · predicciones de demanda a cargo de un modelo de ML independiente.
+**Stack:** Data Science (Python, Pandas, Scikit-Learn) para el modelado de predicciones · Node.js + Express (API) · PostgreSQL (Railway) · Next.js + React, JS plano sin TypeScript (dashboard).
 
 **Dataset actual:** dataset sintético pero realista, agregado por día, barrio de Buenos Aires y especialidad (`data/healthdemand_buenos_aires.xlsx`) — generado con estacionalidad argentina y perfiles socioeconómicos reales de CABA, no datos medidos de una clínica real. Ver [sección 3](#3-qué-datos-usa-hoy).
 
 Documentación relacionada: [PRODUCT.md](PRODUCT.md) (spec de producto, usuarios, posicionamiento) y [DESIGN.md](DESIGN.md) (sistema de diseño). Este archivo es el punto de entrada único para todo lo demás: problema de negocio, arquitectura, cómo levantar el proyecto, contrato para el equipo de ML, y decisiones/pendientes.
+
+---
+
+## Objetivo del negocio
+
+Transformar la planificación médica de un enfoque **reactivo** ("¿cuántos pacientes tuvimos?") a uno **preventivo** ("¿cuántos esperamos y cómo nos preparamos?"), permitiendo:
+- Anticipar incrementos de demanda por especialidad y barrio.
+- Reducir listas de espera mediante overbooking inteligente basado en tasas de ausentismo.
+- Optimizar costos operativos evitando recursos ociosos.
 
 ---
 
@@ -236,3 +246,5 @@ Si su modelo trabaja con pandas, `df.to_dict("records")` (ajustando nombres de c
 ---
 
 **HealthDemand — MVP construido en un programa tipo NoCountry, evaluado por una empresa real.**
+
+**Equipo S08-26-Equipo-23**
