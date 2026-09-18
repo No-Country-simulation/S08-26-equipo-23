@@ -1,13 +1,13 @@
 """
-submit-predictions.py — helper for the ML team to submit demand predictions
-to HealthDemand's API.
+submit-predictions.py — helper para que el equipo de ML mande predicciones
+de demanda a la API de HealthDemand.
 
-HealthDemand does not generate predictions itself; a separate ML team trains
-the model and pushes results here through a single HTTP endpoint:
+HealthDemand no genera predicciones: un equipo aparte entrena el modelo y
+manda los resultados acá a través de un único endpoint HTTP:
 
     POST {API_URL}/api/predictions/import
 
-Request body (exact contract, see README.md section 6):
+Cuerpo del request (contrato exacto, ver README.md sección 6):
 
     {
       "modelVersion": "v1",
@@ -23,24 +23,26 @@ Request body (exact contract, see README.md section 6):
       ]
     }
 
-Field notes:
-  - "specialty" must be one of the 10 existing specialties, "neighborhood"
-    one of the 10 Buenos Aires barrios (see GET /api/historical/specialties
-    and GET /api/historical/neighborhoods for the exact lists — matching is
-    case-insensitive server-side via ILIKE, but exact names are safest).
-  - Re-sending the same date + specialty + neighborhood + modelVersion
-    upserts instead of duplicating, so retries are safe.
-  - Response body on success: {"imported": N, "modelVersion": "v1"}.
+Notas de los campos:
+  - "specialty" tiene que ser una de las 10 especialidades existentes,
+    "neighborhood" uno de los 10 barrios de CABA (ver GET
+    /api/historical/specialties y GET /api/historical/neighborhoods para
+    la lista exacta — el matcheo es case-insensitive del lado del server
+    vía ILIKE, pero lo más seguro es mandar el nombre exacto).
+  - Reenviar la misma date + specialty + neighborhood + modelVersion
+    actualiza el valor en vez de duplicar, así que reintentar es seguro.
+  - Respuesta esperada si sale bien: {"imported": N, "modelVersion": "v1"}.
 
-Dependency: this script only needs the standard library plus `requests`.
-There is no requirements.txt in this project (single external dependency) —
-install it with:
+Dependencia: este script solo necesita la librería estándar más `requests`.
+No hay requirements.txt en este proyecto (es una sola dependencia externa)
+— instalala con:
 
     pip install requests
 
-No pandas dependency is required. If your predictions live in a DataFrame,
-`df.to_dict('records')` converts it directly into the list of dicts this
-script expects (adjust column names to match the contract above first).
+No hace falta pandas. Si tus predicciones viven en un DataFrame,
+`df.to_dict('records')` lo convierte directo en la lista de dicts que
+espera este script (ajustá los nombres de columna al contrato de arriba
+antes de convertir).
 """
 
 import os
@@ -60,13 +62,13 @@ def _resolve_api_url(api_url):
 
 def _validate_predictions(predictions):
     if not isinstance(predictions, list) or len(predictions) == 0:
-        raise ValueError('predictions must be a non-empty list of dicts')
+        raise ValueError('predictions debe ser una lista de dicts, no vacía')
 
     for index, prediction in enumerate(predictions):
         for field in REQUIRED_FIELDS:
             if field not in prediction or prediction[field] is None:
                 raise ValueError(
-                    "Missing required field '{}' in prediction at index {}: {!r}".format(
+                    "Falta el campo obligatorio '{}' en la predicción del índice {}: {!r}".format(
                         field, index, prediction
                     )
                 )
@@ -74,11 +76,12 @@ def _validate_predictions(predictions):
 
 def _warn_unknown_values(predictions, api_url):
     """
-    Best-effort sanity check: fetches the known specialty/neighborhood lists
-    and warns (never raises) about values in `predictions` that don't match
-    either list. This is meant to catch typos before they hit a hard FK
-    error server-side — it never blocks submission, since the lookup itself
-    can fail (e.g. no network) without that being a reason to abort.
+    Chequeo best-effort: trae las listas conocidas de especialidad/barrio y
+    avisa (nunca frena) sobre valores en `predictions` que no matchean
+    ninguna de las dos listas. Sirve para pescar errores de tipeo antes de
+    que se estrellen contra un error de FK del lado del server — nunca
+    bloquea el envío, porque la consulta en sí puede fallar (sin red, por
+    ejemplo) sin que eso sea motivo para abortar.
     """
     try:
         specialties_resp = requests.get('{}/api/historical/specialties'.format(api_url), timeout=10)
@@ -88,9 +91,9 @@ def _warn_unknown_values(predictions, api_url):
         neighborhoods_resp = requests.get('{}/api/historical/neighborhoods'.format(api_url), timeout=10)
         neighborhoods_resp.raise_for_status()
         known_neighborhoods = {str(n).lower() for n in neighborhoods_resp.json()}
-    except Exception as exc:  # noqa: BLE001 - best-effort, never fatal
-        print('[submit-predictions] Warning: could not fetch known specialties/neighborhoods '
-              'for validation ({}). Skipping this check.'.format(exc))
+    except Exception as exc:  # noqa: BLE001 - best-effort, nunca fatal
+        print('[submit-predictions] Aviso: no se pudieron traer las listas de especialidad/barrio '
+              'para validar ({}). Se salta este chequeo.'.format(exc))
         return
 
     unknown_specialties = set()
@@ -104,11 +107,11 @@ def _warn_unknown_values(predictions, api_url):
             unknown_neighborhoods.add(prediction.get('neighborhood'))
 
     if unknown_specialties:
-        print('[submit-predictions] Warning: unrecognized specialty value(s): {}'.format(
+        print('[submit-predictions] Aviso: valor(es) de especialidad no reconocidos: {}'.format(
             sorted(unknown_specialties)
         ))
     if unknown_neighborhoods:
-        print('[submit-predictions] Warning: unrecognized neighborhood value(s): {}'.format(
+        print('[submit-predictions] Aviso: valor(es) de barrio no reconocidos: {}'.format(
             sorted(unknown_neighborhoods)
         ))
 
@@ -120,27 +123,28 @@ def _chunked(items, chunk_size):
 
 def submit_predictions(predictions, model_version='v1', api_url=None, chunk_size=500):
     """
-    Submit a list of prediction dicts to POST {api_url}/api/predictions/import.
+    Manda una lista de predicciones a POST {api_url}/api/predictions/import.
 
     Args:
-        predictions: list of dicts, each with at least 'date', 'specialty',
-            'neighborhood', 'predictedDemand', and optionally 'confidence'.
-        model_version: tag for this batch of predictions (default 'v1').
-        api_url: base URL of the HealthDemand API. If omitted, reads the
-            API_URL environment variable, defaulting to http://localhost:4000.
-        chunk_size: how many predictions to send per request (default 500).
-            Large single requests have been known to struggle through
-            Railway's public proxy (see README.md) — chunking avoids that.
+        predictions: lista de dicts, cada uno con al menos 'date',
+            'specialty', 'neighborhood', 'predictedDemand', y
+            opcionalmente 'confidence'.
+        model_version: etiqueta para esta tanda de predicciones (default 'v1').
+        api_url: URL base de la API de HealthDemand. Si no se pasa, lee la
+            variable de entorno API_URL, con default http://localhost:4000.
+        chunk_size: cuántas predicciones mandar por request (default 500).
+            Requests únicos muy grandes tuvieron problemas con el proxy
+            público de Railway (ver README.md) — mandar en lotes evita eso.
 
     Returns:
-        Total number of predictions imported (sum of each chunk's
-        'imported' field from the response).
+        Cantidad total de predicciones importadas (suma del campo
+        'imported' de la respuesta de cada lote).
 
     Raises:
-        ValueError: if `predictions` is empty/malformed, or a record is
-            missing a required field.
-        RuntimeError: if any chunk's request comes back with a non-2xx
-            status (the response body is included in the error message).
+        ValueError: si `predictions` viene vacío/mal formado, o a algún
+            registro le falta un campo obligatorio.
+        RuntimeError: si algún lote vuelve con un status no-2xx (el cuerpo
+            de la respuesta queda incluido en el mensaje de error).
     """
     _validate_predictions(predictions)
 
@@ -166,7 +170,7 @@ def submit_predictions(predictions, model_version='v1', api_url=None, chunk_size
 
         if not response.ok:
             raise RuntimeError(
-                'Chunk {}/{} failed with status {}: {}'.format(
+                'Lote {}/{} falló con status {}: {}'.format(
                     chunk_number, total_chunks, response.status_code, response.text
                 )
             )
@@ -175,7 +179,7 @@ def submit_predictions(predictions, model_version='v1', api_url=None, chunk_size
         imported = body.get('imported', 0)
         total_imported += imported
 
-        print('[submit-predictions] Chunk {}/{}: {} predictions imported'.format(
+        print('[submit-predictions] Lote {}/{}: {} predicciones importadas'.format(
             chunk_number, total_chunks, imported
         ))
 
@@ -183,10 +187,11 @@ def submit_predictions(predictions, model_version='v1', api_url=None, chunk_size
 
 
 if __name__ == '__main__':
-    # --- Smoke test example -------------------------------------------------
-    # Run this file standalone (`python submit-predictions.py`) against a
-    # local server (`npm run dev` from the repo root) to confirm the
-    # contract works end to end before wiring in real model output.
+    # --- Ejemplo / smoke test ------------------------------------------------
+    # Corré este archivo solo (`python submit-predictions.py`) contra un
+    # server local (`npm run dev` desde la raíz del repo) para confirmar que
+    # el contrato funciona de punta a punta antes de conectar la salida real
+    # del modelo.
     example_predictions = [
         {
             'date': '2026-09-10',
@@ -214,7 +219,7 @@ if __name__ == '__main__':
 
     try:
         total = submit_predictions(example_predictions, model_version='v1')
-        print('Done. Total imported: {}'.format(total))
+        print('Listo. Total importado: {}'.format(total))
     except (ValueError, RuntimeError) as exc:
-        print('submit_predictions failed: {}'.format(exc), file=sys.stderr)
+        print('submit_predictions falló: {}'.format(exc), file=sys.stderr)
         sys.exit(1)

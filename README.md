@@ -3,7 +3,7 @@
 
 **Stack:** Node.js + Express (API) · PostgreSQL (Railway) · Next.js + React, JS plano sin TypeScript (dashboard) · predicciones de demanda a cargo de un modelo de ML independiente.
 
-**Dataset actual:** datos reales agregados por día, barrio de Buenos Aires y especialidad (`data/healthdemand_buenos_aires.xlsx`) — no sintéticos. Ver [sección 3](#3-qué-datos-usa-hoy).
+**Dataset actual:** dataset sintético pero realista, agregado por día, barrio de Buenos Aires y especialidad (`data/healthdemand_buenos_aires.xlsx`) — generado con estacionalidad argentina y perfiles socioeconómicos reales de CABA, no datos medidos de una clínica real. Ver [sección 3](#3-qué-datos-usa-hoy).
 
 Documentación relacionada: [PRODUCT.md](PRODUCT.md) (spec de producto, usuarios, posicionamiento) y [DESIGN.md](DESIGN.md) (sistema de diseño). Este archivo es el punto de entrada único para todo lo demás: problema de negocio, arquitectura, cómo levantar el proyecto, contrato para el equipo de ML, y decisiones/pendientes.
 
@@ -46,17 +46,17 @@ El flujo de datos es una cadena de piezas, cada una alimenta a la siguiente:
 
 ```
 data/healthdemand_buenos_aires.xlsx  →  load-xlsx-to-postgresql.js  →  PostgreSQL (Railway)  →  server/ (API)  →  client/ (dashboard)
-        (dataset real)                      (lo carga a la base)                                  (lo expone HTTP)    (lo muestra)
+     (dataset sintético realista)             (lo carga a la base)                                  (lo expone HTTP)    (lo muestra)
 ```
 
 | Pieza | Qué es | Ubicación |
 |---|---|---|
-| Dataset | Datos reales de demanda de turnos por día, barrio y especialidad (ver sección 3) | `data/healthdemand_buenos_aires.xlsx` |
+| Dataset | Datos sintéticos pero realistas de demanda de turnos por día, barrio y especialidad (ver sección 3) | `data/healthdemand_buenos_aires.xlsx` |
 | Loader | Lee el xlsx y carga/recrea las tablas en Postgres | `load-xlsx-to-postgresql.js` (raíz) |
 | API | Expone los datos por HTTP: histórico, alertas, predicciones | `server/` |
 | Dashboard | Consume la API y muestra gráficos + watchlist de alertas | `client/` |
 
-**Nota sobre el dataset sintético anterior**: `generate-medical-data.js`, `load-to-postgresql.js` y `load-to-mongodb.js` (este último nunca estuvo en uso) generaban y cargaban un dataset sintético (7 especialidades × 3 sedes × 4 franjas horarias × 180 días). Quedan en el repo como referencia/utilidad de testing, pero **ya no son el camino activo** — el dataset real de `data/healthdemand_buenos_aires.xlsx` los reemplazó.
+**Nota sobre el dataset sintético anterior**: `generate-medical-data.js`, `load-to-postgresql.js` y `load-to-mongodb.js` (este último nunca estuvo en uso) generaban y cargaban un dataset sintético arbitrario, sin anclaje al mundo real (7 especialidades × 3 sedes × 4 franjas horarias × 180 días). Quedan en el repo como referencia/utilidad de testing, pero **ya no son el camino activo** — el dataset sintético nuevo de `data/healthdemand_buenos_aires.xlsx`, contextualizado con barrios y estacionalidad reales de CABA, los reemplazó.
 
 La lógica de predicción con Machine Learning **no vive en este proyecto**. La hace otro equipo por separado y se conecta acá mediante un único endpoint (`POST /api/predictions/import`, ver sección 6). HealthDemand no genera predicciones, las recibe y las muestra.
 
@@ -64,7 +64,7 @@ La lógica de predicción con Machine Learning **no vive en este proyecto**. La 
 
 ## 3. ¿Qué datos usa hoy?
 
-Dataset real (`data/healthdemand_buenos_aires.xlsx`): un registro por combinación de **día + barrio + especialidad**, sin franja horaria. **69.100 registros**, enero 2024 a diciembre 2025 (~2 años).
+Dataset sintético pero realista (`data/healthdemand_buenos_aires.xlsx`) — generado por el equipo de datos con estacionalidad argentina (picos de gripe en invierno, alergias en primavera, baja en vacaciones de verano) y perfiles socioeconómicos reales de CABA, no turnos que realmente ocurrieron: un registro por combinación de **día + barrio + especialidad**, sin franja horaria. **69.100 registros**, enero 2024 a diciembre 2025 (~2 años).
 
 - **10 barrios de CABA**: Palermo, Recoleta, Belgrano, Caballito, Almagro, Flores, La Boca, Villa Crespo, Constitución, Nuñez — cada uno con un nivel socioeconómico fijo (alto/medio-alto/medio/medio-bajo/bajo-medio/bajo).
 - **10 especialidades**: Cardiología, Pediatría, Dermatología, Traumatología, Alergología, Neumonología, Gastroenterología, Psicología, Oftalmología, Clínica Médica.
@@ -174,7 +174,7 @@ No necesitan levantar nada del proyecto ni tener el código — solo mandar un `
 - Reenviar el mismo `date`+`specialty`+`neighborhood`+`modelVersion` actualiza el valor en vez de duplicar (es seguro reintentar).
 - En cuanto haya filas ahí, la línea "Proyectada" del dashboard aparece sola — no hace falta tocar el frontend.
 
-**⚠️ Cambio de contrato (2026-09):** este endpoint antes usaba `site` + `timeSlot` (esquema del dataset sintético viejo). Con la migración al dataset real por barrio, `site` pasó a llamarse `neighborhood` y `timeSlot` se eliminó por completo (el dataset nuevo es uno por día, sin franja horaria). Si el equipo de ML ya tenía integrado el contrato viejo, hay que avisarles.
+**⚠️ Cambio de contrato (2026-09):** este endpoint antes usaba `site` + `timeSlot` (esquema del dataset sintético viejo, sin anclaje real). Con la migración al dataset sintético nuevo por barrio, `site` pasó a llamarse `neighborhood` y `timeSlot` se eliminó por completo (el dataset nuevo es uno por día, sin franja horaria). Si el equipo de ML ya tenía integrado el contrato viejo, hay que avisarles.
 
 **Ejemplo en Python:**
 ```python
@@ -205,7 +205,7 @@ Si su modelo trabaja con pandas, `df.to_dict("records")` (ajustando nombres de c
 
 ## 7. Decisiones y bugs corregidos (para que quede el porqué)
 
-### Migración al dataset real (2026-09)
+### Migración al dataset sintético nuevo (2026-09)
 - **Barrio reemplaza sede, sin franja horaria**: el dataset nuevo viene agregado por día+barrio+especialidad (no por sede+franja horaria). Se decidió mantener la convención de nombres en inglés que ya tenía el código (se traduce cada columna española al cargar) en vez de adoptar los nombres del xlsx tal cual.
 - **Se mantiene el z-score propio en vez de `nivel_saturacion`**: el xlsx trae un campo precalculado por el equipo de datos, pero se decidió no reemplazar el detector estadístico propio del backend — es el diferencial de producto documentado en PRODUCT.md. `saturation_level` se guarda aparte, solo informativo.
 - **`total_demand` se calcula en SQL** (`assigned_turns + unmet_demand`) en vez de ser columna física — así el frontend no necesitó tocar `aggregate.js` ni los componentes de gráfico/alertas.
