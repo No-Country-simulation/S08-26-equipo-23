@@ -43,8 +43,18 @@ No hace falta pandas. Si tus predicciones viven en un DataFrame,
 `df.to_dict('records')` lo convierte directo en la lista de dicts que
 espera este script (ajustá los nombres de columna al contrato de arriba
 antes de convertir).
+
+Uso desde la línea de comandos con un CSV ya armado (columnas exactas:
+date,specialty,neighborhood,predictedDemand,confidence — "confidence"
+puede ir vacío):
+
+    python submit-predictions.py predicciones.csv
+    python submit-predictions.py predicciones.csv v2       # modelVersion custom
+
+Sin argumentos, corre el ejemplo de prueba de abajo contra localhost.
 """
 
+import csv
 import os
 import sys
 
@@ -114,6 +124,41 @@ def _warn_unknown_values(predictions, api_url):
         print('[submit-predictions] Aviso: valor(es) de barrio no reconocidos: {}'.format(
             sorted(unknown_neighborhoods)
         ))
+
+
+def _load_predictions_csv(path):
+    """
+    Lee un CSV con columnas date,specialty,neighborhood,predictedDemand,confidence
+    (confidence es opcional, puede venir vacío) y devuelve la lista de dicts
+    lista para pasarle a submit_predictions.
+    """
+    predictions = []
+    with open(path, newline='', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        for row_index, row in enumerate(reader):
+            prediction = {
+                'date': (row.get('date') or '').strip(),
+                'specialty': (row.get('specialty') or '').strip(),
+                'neighborhood': (row.get('neighborhood') or '').strip(),
+            }
+            demand_raw = (row.get('predictedDemand') or '').strip()
+            if demand_raw:
+                try:
+                    prediction['predictedDemand'] = float(demand_raw)
+                except ValueError:
+                    raise ValueError(
+                        "predictedDemand inválido en la fila {} del CSV: {!r}".format(row_index, demand_raw)
+                    )
+            confidence_raw = (row.get('confidence') or '').strip()
+            if confidence_raw:
+                try:
+                    prediction['confidence'] = float(confidence_raw)
+                except ValueError:
+                    raise ValueError(
+                        "confidence inválido en la fila {} del CSV: {!r}".format(row_index, confidence_raw)
+                    )
+            predictions.append(prediction)
+    return predictions
 
 
 def _chunked(items, chunk_size):
@@ -187,39 +232,52 @@ def submit_predictions(predictions, model_version='v1', api_url=None, chunk_size
 
 
 if __name__ == '__main__':
-    # --- Ejemplo / smoke test ------------------------------------------------
-    # Corré este archivo solo (`python submit-predictions.py`) contra un
-    # server local (`npm run dev` desde la raíz del repo) para confirmar que
-    # el contrato funciona de punta a punta antes de conectar la salida real
-    # del modelo.
-    example_predictions = [
-        {
-            'date': '2026-09-10',
-            'specialty': 'Cardiología',
-            'neighborhood': 'Palermo',
-            'predictedDemand': 28.5,
-            'confidence': 0.82
-        },
-        {
-            'date': '2026-09-11',
-            'specialty': 'Pediatría',
-            'neighborhood': 'Recoleta',
-            'predictedDemand': 15.0,
-            'confidence': 0.75
-        },
-        {
-            'date': '2026-09-12',
-            'specialty': 'Dermatología',
-            'neighborhood': 'Belgrano',
-            'predictedDemand': 9.2,
-            'confidence': 0.68
-        }
-    ]
-    # -------------------------------------------------------------------------
+    if len(sys.argv) >= 2:
+        # Modo CSV: python submit-predictions.py predicciones.csv [modelVersion]
+        csv_path = sys.argv[1]
+        cli_model_version = sys.argv[2] if len(sys.argv) >= 3 else 'v1'
 
-    try:
-        total = submit_predictions(example_predictions, model_version='v1')
-        print('Listo. Total importado: {}'.format(total))
-    except (ValueError, RuntimeError) as exc:
-        print('submit_predictions falló: {}'.format(exc), file=sys.stderr)
-        sys.exit(1)
+        try:
+            csv_predictions = _load_predictions_csv(csv_path)
+            print('[submit-predictions] {} filas leídas de {}'.format(len(csv_predictions), csv_path))
+            total = submit_predictions(csv_predictions, model_version=cli_model_version)
+            print('Listo. Total importado: {}'.format(total))
+        except (ValueError, RuntimeError, FileNotFoundError) as exc:
+            print('submit_predictions falló: {}'.format(exc), file=sys.stderr)
+            sys.exit(1)
+    else:
+        # --- Ejemplo / smoke test --------------------------------------------
+        # Corré este archivo sin argumentos (`python submit-predictions.py`)
+        # contra un server local (`npm run dev` desde la raíz del repo) para
+        # confirmar que el contrato funciona de punta a punta.
+        example_predictions = [
+            {
+                'date': '2026-09-10',
+                'specialty': 'Cardiología',
+                'neighborhood': 'Palermo',
+                'predictedDemand': 28.5,
+                'confidence': 0.82
+            },
+            {
+                'date': '2026-09-11',
+                'specialty': 'Pediatría',
+                'neighborhood': 'Recoleta',
+                'predictedDemand': 15.0,
+                'confidence': 0.75
+            },
+            {
+                'date': '2026-09-12',
+                'specialty': 'Dermatología',
+                'neighborhood': 'Belgrano',
+                'predictedDemand': 9.2,
+                'confidence': 0.68
+            }
+        ]
+        # ---------------------------------------------------------------------
+
+        try:
+            total = submit_predictions(example_predictions, model_version='v1')
+            print('Listo. Total importado: {}'.format(total))
+        except (ValueError, RuntimeError) as exc:
+            print('submit_predictions falló: {}'.format(exc), file=sys.stderr)
+            sys.exit(1)

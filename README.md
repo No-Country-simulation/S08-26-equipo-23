@@ -7,7 +7,7 @@ Plataforma de análisis predictivo diseñada para anticipar la demanda de turnos
 - **Backend:** Node.js + Express (API), PostgreSQL (Railway).
 - **Frontend:** Next.js + React, JS plano sin TypeScript (dashboard).
 
-**Dataset actual:** dataset sintético pero realista, agregado por día, barrio de Buenos Aires y especialidad (`data/healthdemand_buenos_aires.xlsx`) — generado con estacionalidad argentina y perfiles socioeconómicos reales de CABA, no datos medidos de una clínica real. Ver [sección 3](#3-qué-datos-usa-hoy).
+**Dataset actual:** dataset sintético pero realista, agregado por día, barrio de Buenos Aires y especialidad (`data/healthdemand_buenos_aires_v2.csv`, versión confirmada-final) — generado con estacionalidad argentina y perfiles socioeconómicos reales de CABA, no datos medidos de una clínica real. Ver [sección 3](#3-qué-datos-usa-hoy).
 
 Documentación relacionada: [PRODUCT.md](PRODUCT.md) (spec de producto, usuarios, posicionamiento) y [DESIGN.md](DESIGN.md) (sistema de diseño). Este archivo es el punto de entrada único para todo lo demás: problema de negocio, arquitectura, cómo levantar el proyecto, y contrato para el equipo de ML.
 
@@ -58,18 +58,18 @@ El proyecto es exitoso si un responsable de planificación puede entrar al siste
 El flujo de datos es una cadena de piezas, cada una alimenta a la siguiente:
 
 ```
-data/healthdemand_buenos_aires.xlsx  →  load-xlsx-to-postgresql.js  →  PostgreSQL (Railway)  →  server/ (API)  →  client/ (dashboard)
+data/healthdemand_buenos_aires_v2.csv  →  load-csv-to-postgresql.js  →  PostgreSQL (Railway)  →  server/ (API)  →  client/ (dashboard)
      (dataset sintético realista)             (lo carga a la base)                                  (lo expone HTTP)    (lo muestra)
 ```
 
 | Pieza | Qué es | Ubicación |
 |---|---|---|
-| Dataset | Datos sintéticos pero realistas de demanda de turnos por día, barrio y especialidad (ver sección 3) | `data/healthdemand_buenos_aires.xlsx` |
-| Loader | Lee el xlsx y carga/recrea las tablas en Postgres | `load-xlsx-to-postgresql.js` (raíz) |
+| Dataset | Datos sintéticos pero realistas de demanda de turnos por día, barrio y especialidad (ver sección 3) | `data/healthdemand_buenos_aires_v2.csv` |
+| Loader | Lee el csv y carga/recrea las tablas en Postgres | `load-csv-to-postgresql.js` (raíz) |
 | API | Expone los datos por HTTP: histórico, alertas, predicciones | `server/` |
 | Dashboard | Consume la API y muestra gráficos + watchlist de alertas | `client/` |
 
-**Nota**: `generate-medical-data.js`, `load-to-postgresql.js` y `load-to-mongodb.js` generaban un dataset sintético anterior, más arbitrario. Quedan en el repo como referencia, pero **ya no son el camino activo** — lo reemplazó `data/healthdemand_buenos_aires.xlsx`.
+**Nota**: `generate-medical-data.js`, `load-to-postgresql.js` y `load-to-mongodb.js` generaban un dataset sintético anterior, más arbitrario. `load-xlsx-to-postgresql.js` cargaba la primera versión del dataset realista (`data/healthdemand_buenos_aires.xlsx`). Todos quedan en el repo como referencia, pero **ya no son el camino activo** — lo reemplazó `load-csv-to-postgresql.js` sobre `data/healthdemand_buenos_aires_v2.csv` (versión confirmada-final, mismas 19 columnas reordenadas + la especialidad "Urgencias").
 
 La lógica de predicción con Machine Learning **no vive en este proyecto**. La hace otro equipo por separado y se conecta acá mediante un único endpoint (`POST /api/predictions/import`, ver sección 6). HealthDemand no genera predicciones, las recibe y las muestra.
 
@@ -77,14 +77,14 @@ La lógica de predicción con Machine Learning **no vive en este proyecto**. La 
 
 ## 3. ¿Qué datos usa hoy?
 
-Dataset sintético pero realista (`data/healthdemand_buenos_aires.xlsx`) — generado por el equipo de datos con estacionalidad argentina (picos de gripe en invierno, alergias en primavera, baja en vacaciones de verano) y perfiles socioeconómicos reales de CABA, no turnos que realmente ocurrieron: un registro por combinación de **día + barrio + especialidad**, sin franja horaria. **69.100 registros**, enero 2024 a diciembre 2025 (~2 años).
+Dataset sintético pero realista (`data/healthdemand_buenos_aires_v2.csv`, versión confirmada-final) — generado por el equipo de datos con estacionalidad argentina (picos de gripe en invierno, alergias en primavera, baja en vacaciones de verano) y perfiles socioeconómicos reales de CABA, no turnos que realmente ocurrieron: un registro por combinación de **día + barrio + especialidad**, sin franja horaria. **70.010 registros**, enero 2024 a diciembre 2025 (~2 años).
 
 - **10 barrios de CABA**: Palermo, Recoleta, Belgrano, Caballito, Almagro, Flores, La Boca, Villa Crespo, Constitución, Nuñez — cada uno con un nivel socioeconómico fijo (alto/medio-alto/medio/medio-bajo/bajo-medio/bajo).
-- **10 especialidades**: Cardiología, Pediatría, Dermatología, Traumatología, Alergología, Neumonología, Gastroenterología, Psicología, Oftalmología, Clínica Médica.
+- **11 especialidades**: Cardiología, Pediatría, Dermatología, Traumatología, Alergología, Neumonología, Gastroenterología, Psicología, Oftalmología, Clínica Médica, Urgencias.
 
 Por cada registro se guarda:
 
-| Campo (DB, inglés) | Columna original del xlsx | Qué significa |
+| Campo (DB, inglés) | Columna original del csv | Qué significa |
 |---|---|---|
 | `date`, `day_of_week`, `day_number`, `month`, `year`, `is_holiday` | `fecha`, `dia_semana`, `numero_dia_semana`, `mes`, `año`, `es_feriado` | Cuándo |
 | `neighborhood` | `barrio` | Barrio de CABA |
@@ -99,7 +99,7 @@ Por cada registro se guarda:
 | `saturation_level` | `nivel_saturacion` | Alto/Medio/Bajo, precalculado por el equipo de datos — **informativo, no alimenta las alertas** (ver sección 5) |
 | `season_factor` | `factor_temporada` | Factor estacional |
 
-`total_demand` no es una columna del xlsx — se reconstruye en la consulta SQL como `assigned_turns + unmet_demand` (demanda total = lo que se asignó + lo que no se pudo atender), igual criterio que usaba el dataset sintético anterior.
+`total_demand` no es una columna del csv — se reconstruye en la consulta SQL como `assigned_turns + unmet_demand` (demanda total = lo que se asignó + lo que no se pudo atender), igual criterio que usaba el dataset sintético anterior.
 
 Además hay una tabla `predictions` (vacía por defecto), pensada para que el equipo de ML cargue ahí sus proyecciones futuras.
 
@@ -122,7 +122,7 @@ Además hay una tabla `predictions` (vacía por defecto), pensada para que el eq
    (usar la URL **pública** de Railway — la que viene por default en las variables del plugin solo resuelve dentro de la red interna de Railway; hay que habilitar "Public Networking" y usar `DATABASE_PUBLIC_URL`).
 3. Instalar dependencias:
    ```bash
-   npm install               # raíz (incluye xlsx y concurrently)
+   npm install               # raíz (incluye csv-parse, xlsx y concurrently)
    cd server && npm install
    cd ../client && npm install
    ```
@@ -132,10 +132,11 @@ Además hay una tabla `predictions` (vacía por defecto), pensada para que el eq
    ```
    (o por separado, en dos terminales: `cd server && npm run dev` / `cd client && npm run dev`).
 
-La base ya tiene los 69.100 registros cargados — no hace falta correr el loader de nuevo salvo que se actualice el dataset:
+La base ya tiene los 70.010 registros cargados — no hace falta correr el loader de nuevo salvo que se actualice el dataset:
 
 ```bash
-npm run load-xlsx   # ⚠️ dropea y recrea neighborhoods/specialties/historical_turns
+npm run load-csv    # ⚠️ camino actual — dropea y recrea neighborhoods/specialties/historical_turns desde el csv v2
+npm run load-xlsx   # ⚠️ camino anterior/legacy — mismo efecto, pero desde el xlsx v1 (10 especialidades, sin "Urgencias")
 ```
 
 ---
@@ -183,7 +184,7 @@ No necesitan levantar nada del proyecto ni tener el código — solo mandar un `
 }
 ```
 
-- `specialty` debe ser una de las 10 existentes, `neighborhood` uno de los 10 barrios (ver `GET /api/historical/specialties` y `GET /api/historical/neighborhoods` para la lista exacta — ambos parámetros aceptan mayúsculas/minúsculas indistintamente).
+- `specialty` debe ser una de las 11 existentes, `neighborhood` uno de los 10 barrios (ver `GET /api/historical/specialties` y `GET /api/historical/neighborhoods` para la lista exacta — ambos parámetros aceptan mayúsculas/minúsculas indistintamente).
 - Reenviar el mismo `date`+`specialty`+`neighborhood`+`modelVersion` actualiza el valor en vez de duplicar (es seguro reintentar).
 - En cuanto haya filas ahí, la línea "Proyectada" del dashboard aparece sola — no hace falta tocar el frontend.
 
