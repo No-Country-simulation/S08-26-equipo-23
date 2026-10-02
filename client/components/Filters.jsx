@@ -44,7 +44,6 @@ export default function Filters({
           className="num"
           value={to || ''}
           min={minDate}
-          max={maxDate}
           onChange={(e) => onToChange(e.target.value)}
         />
       </label>
